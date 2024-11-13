@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, onBeforeUnmount, computed } from 'vue'
+import { ref, inject, onBeforeUnmount, computed, watch } from 'vue'
 import debounce from 'lodash.debounce'
 import { AiService } from '@/services/aiService'
 
@@ -8,9 +8,8 @@ const backgroundImage = ref('')
 const newImageUrl = ref('')
 const isLoaded = ref(false)
 const isTransitioning = ref(false)
-const devMode = ref(true)
+const devMode = ref(false)
 
-// Compute whether we're in dev mode
 const isDev = computed(() => process.env.NODE_ENV === 'development')
 
 const aiService = inject('aiService', new AiService(
@@ -22,25 +21,31 @@ const aiService = inject('aiService', new AiService(
 const updateBackground = debounce(async () => {
   if (!title.value) return
   try {
-    const service = new AiService(
-      import.meta.env.VITE_GROQ_API_KEY,
-      import.meta.env.VITE_FAL_API_KEY,
-      { devMode: devMode.value }
-    )
-    
-    const enhancedPrompt = await service.generatePrompt(title.value)
+    const enhancedPrompt = await aiService.generatePrompt(title.value)
     console.log('Enhanced prompt:', enhancedPrompt)
     
-    const imageUrl = await service.generateImage(enhancedPrompt)
-    newImageUrl.value = imageUrl
+    const imageUrl = await aiService.generateImage(enhancedPrompt)
+    if (devMode.value || !backgroundImage.value) {
+      // Set immediately for dev mode or first image
+      backgroundImage.value = imageUrl
+    } else {
+      // Use transition for subsequent images
+      newImageUrl.value = imageUrl
+    }
   } catch (error) {
     console.error('Failed to generate image:', error)
   }
 }, 500)
 
+watch(devMode, (newValue) => {
+  aiService.devMode = newValue
+  if (title.value) {
+    updateBackground()
+  }
+})
+
 const handleImageLoad = () => {
   isLoaded.value = true
-  // Start transition on next frame to ensure opacity: 0 is applied first
   requestAnimationFrame(() => {
     isTransitioning.value = true
   })
@@ -63,7 +68,7 @@ onBeforeUnmount(() => {
     <!-- Current background -->
     <div 
       class="background-layer"
-      :style="{ backgroundImage: `url(${backgroundImage})` }"
+      :style="{ backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none' }"
       data-test="slide-background"
     />
     
@@ -79,7 +84,7 @@ onBeforeUnmount(() => {
     
     <!-- Hidden image preloader -->
     <img 
-      v-if="newImageUrl"
+      v-show="newImageUrl"
       :src="newImageUrl"
       @load="handleImageLoad"
       class="preload-image"
