@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { AiService } from '../aiService'
 
 describe('AiService', () => {
@@ -117,5 +117,27 @@ describe('AiService', () => {
     await expect(service.generateImage('A mountain sunset'))
       .rejects
       .toThrow('Failed to generate image: Network error')
+  })
+
+  describe('dev mode', () => {
+    beforeEach(() => {
+      global.fetch = vi.fn()
+    })
+
+    it('returns placeholder prompt in dev mode without making API calls', async () => {
+      const service = new AiService('mock-groq-key', 'mock-fal-key', { devMode: true })
+      const result = await service.generatePrompt('Mountain sunset')
+      
+      expect(result).toBe('[DEV MODE] Prompt for: Mountain sunset')
+      expect(fetch).not.toHaveBeenCalled()
+    })
+
+    it('returns placeholder image URL in dev mode without making API calls', async () => {
+      const service = new AiService('mock-groq-key', 'mock-fal-key', { devMode: true })
+      const result = await service.generateImage('Mountain sunset')
+      
+      expect(result).toBe('https://placehold.co/1024x1024?text=Mountain+sunset')
+      expect(fetch).not.toHaveBeenCalled()
+    })
   })
 }) 

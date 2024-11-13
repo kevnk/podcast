@@ -106,4 +106,29 @@ describe('Slideshow.vue', () => {
     
     expect(aiService.generatePrompt).not.toHaveBeenCalled()
   })
+
+  it('toggles dev mode when checkbox is clicked', async () => {
+    const wrapper = mount(Slideshow, {
+      global: {
+        provide: {
+          aiService
+        }
+      }
+    })
+    
+    // Mock import.meta.env.DEV
+    vi.stubGlobal('import.meta.env.DEV', true)
+    
+    const input = wrapper.find('[data-test="title-input"]')
+    const devModeToggle = wrapper.find('[data-test="dev-mode-toggle"]')
+    
+    await input.setValue('Mountain')
+    await devModeToggle.setValue(true)
+    await vi.runAllTimers()
+    
+    expect(wrapper.find('[data-test="slide-background"]').attributes('style'))
+      .toContain('placehold.co')
+    
+    vi.unstubGlobal('import.meta.env.DEV')
+  })
 }) 

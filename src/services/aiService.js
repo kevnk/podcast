@@ -1,13 +1,18 @@
 export class AiService {
-  constructor(groqKey, falKey) {
+  constructor(groqKey, falKey, options = {}) {
     if (!groqKey || !falKey) {
       throw new Error('Both Groq and fal.ai API keys are required')
     }
     this.groqKey = groqKey
     this.falKey = falKey
+    this.devMode = options.devMode || false
   }
 
   async generatePrompt(input) {
+    if (this.devMode) {
+      return `[DEV MODE] Prompt for: ${input}`
+    }
+
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -45,6 +50,10 @@ export class AiService {
   }
 
   async generateImage(prompt) {
+    if (this.devMode) {
+      return `https://placehold.co/1024x1024?text=${prompt.replace(/\s+/g, '+')}`
+    }
+
     try {
       const response = await fetch('https://fal.run/fal-ai/flux/dev', {
         method: 'POST',
