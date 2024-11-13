@@ -5,7 +5,10 @@ import { AiService } from '@/services/aiService'
 
 const title = ref('')
 const backgroundImage = ref('')
-const devMode = ref(false)
+const newImageUrl = ref('')
+const isLoaded = ref(false)
+const isTransitioning = ref(false)
+const devMode = ref(true)
 
 // Compute whether we're in dev mode
 const isDev = computed(() => process.env.NODE_ENV === 'development')
@@ -19,7 +22,6 @@ const aiService = inject('aiService', new AiService(
 const updateBackground = debounce(async () => {
   if (!title.value) return
   try {
-    // Recreate service with current dev mode value
     const service = new AiService(
       import.meta.env.VITE_GROQ_API_KEY,
       import.meta.env.VITE_FAL_API_KEY,
@@ -30,11 +32,26 @@ const updateBackground = debounce(async () => {
     console.log('Enhanced prompt:', enhancedPrompt)
     
     const imageUrl = await service.generateImage(enhancedPrompt)
-    backgroundImage.value = imageUrl
+    newImageUrl.value = imageUrl
   } catch (error) {
     console.error('Failed to generate image:', error)
   }
 }, 500)
+
+const handleImageLoad = () => {
+  isLoaded.value = true
+  // Start transition on next frame to ensure opacity: 0 is applied first
+  requestAnimationFrame(() => {
+    isTransitioning.value = true
+  })
+}
+
+const handleTransitionEnd = () => {
+  backgroundImage.value = newImageUrl.value
+  newImageUrl.value = ''
+  isLoaded.value = false
+  isTransitioning.value = false
+}
 
 onBeforeUnmount(() => {
   updateBackground.cancel()
@@ -42,7 +59,33 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="fullscreen" data-test="slide-background" :style="{ backgroundImage: `url(${backgroundImage})` }">
+  <div class="fullscreen">
+    <!-- Current background -->
+    <div 
+      class="background-layer"
+      :style="{ backgroundImage: `url(${backgroundImage})` }"
+      data-test="slide-background"
+    />
+    
+    <!-- New image layer -->
+    <div 
+      v-if="newImageUrl && isLoaded"
+      class="background-layer"
+      :class="{ 'fade-in': isTransitioning }"
+      :style="{ backgroundImage: `url(${newImageUrl})` }"
+      @transitionend="handleTransitionEnd"
+      data-test="new-image"
+    />
+    
+    <!-- Hidden image preloader -->
+    <img 
+      v-if="newImageUrl"
+      :src="newImageUrl"
+      @load="handleImageLoad"
+      class="preload-image"
+      alt=""
+    />
+
     <input
       type="text"
       v-model="title"
@@ -51,6 +94,7 @@ onBeforeUnmount(() => {
       data-test="title-input"
       class="title-input"
     />
+    
     <div v-if="isDev" class="dev-controls">
       <label>
         <input
@@ -72,15 +116,44 @@ onBeforeUnmount(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-size: cover;
-  background-position: center;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 
+.background-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.background-layer:first-child {
+  opacity: 1;
+}
+
+.background-layer.fade-in {
+  opacity: 1;
+}
+
+.preload-image {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Rest of your existing styles */
 .title-input {
+  position: relative;
+  z-index: 1;
   background: transparent;
   border: none;
   color: white;
@@ -105,5 +178,6 @@ onBeforeUnmount(() => {
   padding: 10px;
   border-radius: 5px;
   color: white;
+  z-index: 1;
 }
 </style> 

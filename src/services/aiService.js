@@ -52,7 +52,7 @@ export class AiService {
   async generateImage(prompt) {
     if (this.devMode) {
       const randomColor = Math.floor(Math.random()*16777215).toString(16);
-      return `https://placehold.co/1024x1024/${randomColor}/ffffff?text=${prompt.replace(/\s+/g, '+')}`
+      return `https://placehold.co/1024x1024/${randomColor}/ffffff?text=_`
     }
 
     try {

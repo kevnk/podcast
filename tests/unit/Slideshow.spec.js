@@ -131,4 +131,69 @@ describe('Slideshow.vue', () => {
     
     vi.unstubGlobal('import.meta.env.DEV')
   })
+})
+
+describe('Slideshow Image Transitions', () => {
+  let aiService
+  let wrapper
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    
+    aiService = new AiService('test-groq-key', 'test-fal-key')
+    aiService.generatePrompt = vi.fn().mockResolvedValue('Enhanced prompt')
+    aiService.generateImage = vi.fn().mockResolvedValue('https://example.com/new-image.jpg')
+    
+    wrapper = mount(Slideshow, {
+      global: {
+        provide: {
+          aiService
+        }
+      }
+    })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    vi.clearAllTimers()
+  })
+
+  it('fades between images smoothly', async () => {
+    // Set initial background
+    wrapper.vm.backgroundImage = 'https://example.com/initial-image.jpg'
+    
+    // Trigger new image generation
+    const input = wrapper.find('[data-test="title-input"]')
+    await input.setValue('New Image')
+    await vi.runAllTimers()
+    await flushPromises()
+
+    // Verify new layer is not visible before image loads
+    expect(wrapper.find('[data-test="new-image"]').exists()).toBe(false)
+
+    // Simulate image load
+    const preloadImage = wrapper.find('.preload-image')
+    await preloadImage.trigger('load')
+    
+    // Wait for next animation frame
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    
+    // Verify both layers exist during transition
+    const oldLayer = wrapper.find('[data-test="slide-background"]')
+    const newLayer = wrapper.find('[data-test="new-image"]')
+    
+    expect(oldLayer.attributes('style'))
+      .toBe('background-image: url(https://example.com/initial-image.jpg);')
+    expect(newLayer.attributes('style'))
+      .toBe('background-image: url(https://example.com/generated-image.jpg);')
+    expect(newLayer.classes()).toContain('fade-in')
+    
+    // Simulate transition end
+    await newLayer.trigger('transitionend')
+    
+    // Verify cleanup
+    expect(wrapper.vm.backgroundImage).toBe('https://example.com/generated-image.jpg')
+    expect(wrapper.vm.newImageUrl).toBe('')
+    expect(wrapper.find('[data-test="new-image"]').exists()).toBe(false)
+  })
 }) 
