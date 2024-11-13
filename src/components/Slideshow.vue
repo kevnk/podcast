@@ -9,8 +9,14 @@ const newImageUrl = ref('');
 const isLoaded = ref(false);
 const isTransitioning = ref(false);
 const devMode = ref(false);
+const isLoading = ref(false);
 
 const isDev = computed(() => process.env.NODE_ENV === 'development');
+
+// Update document title when loading state or title changes
+watch([isLoading, title], ([loading, currentTitle]) => {
+	document.title = loading ? 'Loading...' : (currentTitle || 'Enter your title...');
+});
 
 const aiService = inject('aiService', new AiService(
 	import.meta.env.VITE_GROQ_API_KEY,
@@ -21,6 +27,7 @@ const aiService = inject('aiService', new AiService(
 const updateBackground = debounce(async () => {
 	if (!title.value) return;
 	try {
+		isLoading.value = true;
 		const enhancedPrompt = await aiService.generatePrompt(title.value);
 		console.log('Enhanced prompt:', enhancedPrompt);
 
@@ -28,12 +35,14 @@ const updateBackground = debounce(async () => {
 		if (devMode.value || !backgroundImage.value) {
 			// Set immediately for dev mode or first image
 			backgroundImage.value = imageUrl;
+			isLoading.value = false;
 		} else {
 			// Use transition for subsequent images
 			newImageUrl.value = imageUrl;
 		}
 	} catch (error) {
 		console.error('Failed to generate image:', error);
+		isLoading.value = false;
 	}
 }, 500);
 
@@ -46,6 +55,7 @@ watch(devMode, (newValue) => {
 
 const handleImageLoad = () => {
 	isLoaded.value = true;
+	isLoading.value = false;
 	requestAnimationFrame(() => {
 		isTransitioning.value = true;
 	});
@@ -60,6 +70,7 @@ const handleTransitionEnd = () => {
 
 onBeforeUnmount(() => {
 	updateBackground.cancel();
+	document.title = 'Enter your title...'; // Reset title on unmount
 });
 </script>
 
