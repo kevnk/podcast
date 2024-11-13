@@ -29,7 +29,7 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: "You are a creative assistant that generates descriptive abstract art image prompts. Keep the prompts concise but vivid. Draw from the user's input to find the sentiment and tone of the image."
+              content: `You are a creative assistant that generates descriptive abstract non-objective art image prompts. Keep the prompts concise but vivid. Draw from the user's input to find the sentiment and tone of the image. Remember all images should be non-objective and abstract so they can be used for thumbnail images. Keep them in the style of a famous artist.`
             },
             {
               role: "user",
