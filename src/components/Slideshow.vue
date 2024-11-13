@@ -1,24 +1,31 @@
 <script setup>
-import { ref, inject } from 'vue'
+import { ref, inject, onBeforeUnmount } from 'vue'
 import debounce from 'lodash.debounce'
+import { AiService } from '@/services/aiService'
 
 const title = ref('')
 const backgroundImage = ref('')
-const aiService = inject('aiService', { generateImage: () => {} })
-
-const generatePrompt = () => {
-  return `Create a visual representation of: ${title.value}`
-}
+const aiService = inject('aiService', new AiService(
+  import.meta.env.VITE_GROQ_API_KEY,
+  import.meta.env.VITE_FAL_API_KEY
+))
 
 const updateBackground = debounce(async () => {
   if (!title.value) return
   try {
-    const imageUrl = await aiService.generateImage(generatePrompt())
+    const enhancedPrompt = await aiService.generatePrompt(title.value)
+    console.log('Enhanced prompt:', enhancedPrompt)
+    
+    const imageUrl = await aiService.generateImage(enhancedPrompt)
     backgroundImage.value = imageUrl
   } catch (error) {
     console.error('Failed to generate image:', error)
   }
 }, 500)
+
+onBeforeUnmount(() => {
+  updateBackground.cancel()
+})
 </script>
 
 <template>

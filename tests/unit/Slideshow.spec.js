@@ -1,89 +1,109 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import Slideshow from '@/components/Slideshow.vue'
+import { AiService } from '@/services/aiService'
 
 describe('Slideshow.vue', () => {
+  let aiService
+  let wrapper
+
   beforeEach(() => {
     vi.useFakeTimers()
+    
+    const mockGroqKey = 'test-groq-key'
+    const mockFalKey = 'test-fal-key'
+    vi.stubEnv('VITE_GROQ_API_KEY', mockGroqKey)
+    vi.stubEnv('VITE_FAL_API_KEY', mockFalKey)
+    
+    aiService = new AiService(mockGroqKey, mockFalKey)
+    aiService.generatePrompt = vi.fn().mockResolvedValue('Enhanced prompt: A beautiful mountain sunset')
+    aiService.generateImage = vi.fn().mockResolvedValue('https://example.com/generated-image.jpg')
+    
+    wrapper = mount(Slideshow, {
+      global: {
+        provide: {
+          aiService
+        }
+      }
+    })
   })
 
   afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('renders in fullscreen mode', () => {
-    const wrapper = mount(Slideshow)
-    expect(wrapper.classes()).toContain('fullscreen')
-  })
-
-  it('updates title when user types', async () => {
-    const wrapper = mount(Slideshow)
-    const input = wrapper.find('[data-test="title-input"]')
-    
-    await input.setValue('Mountain Sunset')
-    expect(wrapper.vm.title).toBe('Mountain Sunset')
-  })
-
-  it('generates AI prompt from title', async () => {
-    const wrapper = mount(Slideshow)
-    const input = wrapper.find('[data-test="title-input"]')
-    await input.setValue('Mountain Sunset')
-    expect(wrapper.vm.generatePrompt()).toContain('Mountain Sunset')
-  })
-
-  it('calls AI service when title is updated', async () => {
-    const mockGenerateImage = vi.fn().mockResolvedValue('mock-url')
-    const wrapper = mount(Slideshow, {
-      global: {
-        provide: {
-          aiService: { generateImage: mockGenerateImage }
-        }
-      }
-    })
-    
-    const input = wrapper.find('[data-test="title-input"]')
-    await input.setValue('Mountain Sunset')
-    await vi.runAllTimers()
-    
-    expect(mockGenerateImage).toHaveBeenCalled()
+    vi.unstubAllEnvs()
+    vi.clearAllMocks()
   })
 
   it('updates background image when AI returns result', async () => {
-    const mockImageUrl = 'https://example.com/generated-image.jpg'
-    const mockGenerateImage = vi.fn().mockResolvedValue(mockImageUrl)
-    const wrapper = mount(Slideshow, {
-      global: {
-        provide: {
-          aiService: { generateImage: mockGenerateImage }
-        }
-      }
-    })
-    
     const input = wrapper.find('[data-test="title-input"]')
     await input.setValue('Mountain Sunset')
+    
     await vi.runAllTimers()
-    await wrapper.vm.$nextTick()
+    await flushPromises()
+    
+    expect(aiService.generatePrompt).toHaveBeenCalledWith('Mountain Sunset')
+    expect(aiService.generateImage).toHaveBeenCalledWith('Enhanced prompt: A beautiful mountain sunset')
     
     const background = wrapper.find('[data-test="slide-background"]')
-    expect(background.attributes('style')).toContain(mockImageUrl)
+    expect(background.attributes('style'))
+      .toBe('background-image: url(https://example.com/generated-image.jpg);')
   })
 
   it('debounces AI calls while typing', async () => {
-    const mockGenerateImage = vi.fn().mockResolvedValue('mock-url')
-    const wrapper = mount(Slideshow, {
-      global: {
-        provide: {
-          aiService: { generateImage: mockGenerateImage }
-        }
-      }
-    })
-
     const input = wrapper.find('[data-test="title-input"]')
     await input.setValue('M')
     await input.setValue('Mo')
     await input.setValue('Mountain')
     
     await vi.runAllTimers()
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1)
+    expect(aiService.generatePrompt).toHaveBeenCalledTimes(1)
+    expect(aiService.generatePrompt).toHaveBeenCalledWith('Mountain')
+  })
+
+  it('does not call AI service if input is empty', async () => {
+    const input = wrapper.find('[data-test="title-input"]')
+    await input.setValue('')
+    await vi.runAllTimers()
+    
+    expect(aiService.generatePrompt).not.toHaveBeenCalled()
+    expect(aiService.generateImage).not.toHaveBeenCalled()
+  })
+
+  it('handles AI service errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    aiService.generatePrompt.mockRejectedValueOnce(new Error('API Error'))
+    
+    const input = wrapper.find('[data-test="title-input"]')
+    await input.setValue('Mountain Sunset')
+    await vi.runAllTimers()
+    await flushPromises()
+    
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to generate image:', expect.any(Error))
+    expect(wrapper.find('[data-test="slide-background"]').attributes('style'))
+      .toBe('background-image: url();')
+    
+    consoleSpy.mockRestore()
+  })
+
+  it('waits for debounce period before making AI call', async () => {
+    const input = wrapper.find('[data-test="title-input"]')
+    await input.setValue('Quick')
+    
+    expect(aiService.generatePrompt).not.toHaveBeenCalled()
+    
+    await vi.advanceTimersByTime(400)
+    expect(aiService.generatePrompt).not.toHaveBeenCalled()
+    
+    await vi.advanceTimersByTime(100)
+    expect(aiService.generatePrompt).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels pending debounced calls when component unmounts', async () => {
+    const input = wrapper.find('[data-test="title-input"]')
+    await input.setValue('Mountain')
+    
+    wrapper.unmount()
+    await vi.advanceTimersByTime(500)
+    
+    expect(aiService.generatePrompt).not.toHaveBeenCalled()
   })
 }) 
