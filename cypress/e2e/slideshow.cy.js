@@ -7,8 +7,9 @@ describe('Slideshow', () => {
     // Dev mode toggle should be visible in development
     cy.get('[data-test="dev-mode-toggle"]').should('be.visible')
 
-    // Type something in the input
-    cy.get('[data-test="title-input"]').type('Mountain sunset')
+    // Type something in the input and press Enter
+    cy.get('[data-test="title-input"]')
+      .type('Mountain sunset{enter}')
 
     // Enable dev mode
     cy.get('[data-test="dev-mode-toggle"]').click()
@@ -26,8 +27,10 @@ describe('Slideshow', () => {
       cy.spy(win.console, 'log').as('consoleLog')
     })
 
-    // Type new text to trigger update
-    cy.get('[data-test="title-input"]').clear().type('New text')
+    // Type new text and press Enter
+    cy.get('[data-test="title-input"]')
+      .clear()
+      .type('New text{enter}')
     cy.wait(600)
 
     cy.get('@consoleLog').should('have.been.calledWith', 

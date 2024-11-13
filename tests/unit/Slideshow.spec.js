@@ -18,12 +18,12 @@ describe('Slideshow.vue', () => {
 		vi.stubEnv('VITE_FAL_API_KEY', mockFalKey);
 
 		aiService = new AiService(mockGroqKey, mockFalKey);
-		aiService.generatePrompt = vi.fn().mockImplementation(text =>
-			mockDevMode ? `[DEV MODE] Prompt for: ${text}` : 'Enhanced prompt: A beautiful mountain sunset'
-		);
-		aiService.generateImage = vi.fn().mockImplementation(() =>
-			mockDevMode ? 'https://placehold.co/600x400' : 'https://example.com/generated-image.jpg'
-		);
+aiService.generatePrompt = vi.fn().mockImplementation(text =>
+  mockDevMode ? `[DEV MODE] Prompt for: ${text}` : 'Enhanced prompt: A beautiful mountain sunset'
+);
+aiService.generateImage = vi.fn().mockImplementation(() =>
+  mockDevMode ? 'https://placehold.co/600x400' : 'https://example.com/new-image.jpg'
+);
 		
 		wrapper = mount(Slideshow, {
 			global: {
@@ -42,7 +42,8 @@ describe('Slideshow.vue', () => {
 	it('updates background image when AI returns result', async () => {
 		const input = wrapper.find('[data-test="title-input"]');
 		await input.setValue('Mountain Sunset');
-
+		await input.trigger('keyup.enter');
+		
 		await vi.runAllTimers();
 		await flushPromises();
 
@@ -50,17 +51,22 @@ describe('Slideshow.vue', () => {
 		expect(aiService.generateImage).toHaveBeenCalledWith('Enhanced prompt: A beautiful mountain sunset');
 
 		const background = wrapper.find('[data-test="slide-background"]');
-		expect(background.attributes('style'))
-			.toBe('background-image: url(https://example.com/generated-image.jpg);');
+expect(background.attributes('style'))
+  .toBe('background-image: url(https://example.com/new-image.jpg);');
 	});
 
-	it('debounces AI calls while typing', async () => {
+	it('only generates image when Enter is pressed', async () => {
 		const input = wrapper.find('[data-test="title-input"]');
-		await input.setValue('M');
-		await input.setValue('Mo');
 		await input.setValue('Mountain');
-
 		await vi.runAllTimers();
+		
+		// Should not generate on normal input
+		expect(aiService.generatePrompt).not.toHaveBeenCalled();
+		
+		// Should generate on Enter
+		await input.trigger('keyup.enter');
+		await vi.runAllTimers();
+		
 		expect(aiService.generatePrompt).toHaveBeenCalledTimes(1);
 		expect(aiService.generatePrompt).toHaveBeenCalledWith('Mountain');
 	});
@@ -80,6 +86,8 @@ describe('Slideshow.vue', () => {
 
 		const input = wrapper.find('[data-test="title-input"]');
 		await input.setValue('Mountain Sunset');
+		await input.trigger('keyup.enter');
+		
 		await vi.runAllTimers();
 		await flushPromises();
 
@@ -93,6 +101,7 @@ describe('Slideshow.vue', () => {
 	it('waits for debounce period before making AI call', async () => {
 		const input = wrapper.find('[data-test="title-input"]');
 		await input.setValue('Quick');
+		await input.trigger('keyup.enter');
 
 		expect(aiService.generatePrompt).not.toHaveBeenCalled();
 
@@ -101,6 +110,7 @@ describe('Slideshow.vue', () => {
 
 		await vi.advanceTimersByTime(100);
 		expect(aiService.generatePrompt).toHaveBeenCalledTimes(1);
+		expect(aiService.generatePrompt).toHaveBeenCalledWith('Quick');
 	});
 
 	it('cancels pending debounced calls when component unmounts', async () => {
@@ -127,6 +137,7 @@ describe('Slideshow.vue', () => {
 	
 		const input = wrapper.find('[data-test="title-input"]');
 		await input.setValue('Mountain');
+		await input.trigger('keyup.enter');
 	
 		const devModeToggle = wrapper.find('[data-test="dev-mode-toggle"]');
 		expect(devModeToggle.exists()).toBe(true);
@@ -143,6 +154,52 @@ describe('Slideshow.vue', () => {
 	
 		vi.unstubAllEnvs();
 		mockDevMode = false;
+	});
+
+	it('fades between images smoothly', async () => {
+		// Disable dev mode
+		wrapper.vm.devMode = false;
+
+		// Set initial background
+		wrapper.vm.backgroundImage = 'https://example.com/initial-image.jpg';
+
+		// Trigger new image generation with Enter key
+		const input = wrapper.find('[data-test="title-input"]');
+		await input.setValue('New Image');
+		await input.trigger('keyup.enter');
+		await vi.runAllTimers();
+		await flushPromises();
+
+		// Verify new layer is not visible before image loads
+		expect(wrapper.find('[data-test="new-image"]').exists()).toBe(false);
+
+		// Mock requestAnimationFrame
+		const rafSpy = vi.spyOn(window, 'requestAnimationFrame')
+			.mockImplementation(cb => setTimeout(cb, 0));
+
+		// Simulate image load
+		await wrapper.find('.preload-image').trigger('load');
+		
+		// Wait for the next tick to allow requestAnimationFrame to execute
+		await vi.runAllTimers();
+		await flushPromises();
+
+		const newLayer = wrapper.find('[data-test="new-image"]');
+		expect(newLayer.exists()).toBe(true);
+		expect(newLayer.attributes('style'))
+			.toBe('background-image: url(https://example.com/new-image.jpg);');
+		expect(newLayer.classes()).toContain('fade-in');
+
+		// Simulate transition end
+		await newLayer.trigger('transitionend');
+		await flushPromises();
+
+		// Verify cleanup
+		expect(wrapper.vm.newImageUrl).toBe('');
+		expect(wrapper.find('[data-test="new-image"]').exists()).toBe(false);
+
+		// Clean up
+		rafSpy.mockRestore();
 	});
 });
 
@@ -178,9 +235,10 @@ describe('Slideshow Image Transitions', () => {
 		// Set initial background
 		wrapper.vm.backgroundImage = 'https://example.com/initial-image.jpg';
 
-		// Trigger new image generation
+		// Trigger new image generation with Enter key
 		const input = wrapper.find('[data-test="title-input"]');
 		await input.setValue('New Image');
+		await input.trigger('keyup.enter');
 		await vi.runAllTimers();
 		await flushPromises();
 

@@ -9,6 +9,10 @@ export class AiService {
   }
 
   async generatePrompt(input) {
+    if (!input || input.trim() === '') {
+      throw new Error('Input cannot be empty')
+    }
+
     if (this.devMode) {
       return `[DEV MODE] Prompt for: ${input}`
     }
@@ -25,7 +29,7 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: "You are a creative assistant that generates descriptive image prompts. Keep the prompts concise but vivid."
+              content: "You are a creative assistant that generates descriptive abstract art image prompts. Keep the prompts concise but vivid. Draw from the user's input to find the sentiment and tone of the image."
             },
             {
               role: "user",
@@ -51,8 +55,8 @@ export class AiService {
 
   async generateImage(prompt) {
     if (this.devMode) {
-      const randomColor = Math.floor(Math.random()*16777215).toString(16);
-      return `https://placehold.co/1024x1024/${randomColor}/ffffff?text=_`
+      const encodedPrompt = prompt.replace(/ /g, '+')
+      return `https://placehold.co/1024x1024?text=${encodedPrompt}`
     }
 
     try {
