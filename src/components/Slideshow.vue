@@ -49,6 +49,7 @@ onBeforeUnmount(() => {
       @input="updateBackground"
       placeholder="Enter your title..."
       data-test="title-input"
+      class="title-input"
     />
     <div v-if="isDev" class="dev-controls">
       <label>
@@ -73,29 +74,36 @@ onBeforeUnmount(() => {
   height: 100vh;
   background-size: cover;
   background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-input {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 1rem;
-  font-size: 1.5rem;
+.title-input {
+  background: transparent;
   border: none;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.9);
+  color: white;
+  font-size: 4rem;
+  font-weight: 700;
+  text-align: center;
   width: 80%;
-  max-width: 600px;
+  padding: 20px;
+  outline: none;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.title-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .dev-controls {
   position: fixed;
   bottom: 20px;
-  left: 20px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.5);
   padding: 10px;
-  border-radius: 4px;
+  border-radius: 5px;
+  color: white;
 }
 </style> 
